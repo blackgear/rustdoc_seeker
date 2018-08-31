@@ -1,82 +1,8 @@
-use seeker::{DocItem, RustDoc};
+use seeker::{DocItem, RustDoc, TypeItem};
 use serde_json;
-use std::fmt::Write;
+use std::collections::HashSet;
 use std::str::FromStr;
-use string_cache::DefaultAtom;
-
-macro_rules! enum_number {
-    ($name:ident { $($variant:ident|$display:expr ; $value:expr, )* }) => {
-        #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-        pub enum $name {
-            $($variant = $value,)*
-        }
-
-        impl ::std::fmt::Display for $name {
-            fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
-                match self {
-                    $( $name::$variant => write!(f, "{}", $display), )*
-                }
-            }
-        }
-
-        impl<'de> ::serde::Deserialize<'de> for $name {
-            fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-            where
-                D: ::serde::Deserializer<'de>,
-            {
-                struct Visitor;
-
-                impl<'de> ::serde::de::Visitor<'de> for Visitor {
-                    type Value = $name;
-
-                    fn expecting(&self, formatter: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
-                        formatter.write_str("positive integer")
-                    }
-
-                    fn visit_u64<E>(self, value: u64) -> Result<$name, E>
-                    where
-                        E: ::serde::de::Error,
-                    {
-                        match value {
-                            $( $value => Ok($name::$variant), )*
-                            _ => Err(E::custom(
-                                format!("unknown {} value: {}",
-                                stringify!($name), value))),
-                        }
-                    }
-                }
-
-                deserializer.deserialize_u64(Visitor)
-            }
-        }
-    }
-}
-
-enum_number!(ItemType {
-    Module          | "module"          ; 0,
-    ExternCrate     | "externcrate"     ; 1,
-    Import          | "import"          ; 2,
-    Struct          | "struct"          ; 3,
-    Enum            | "enum"            ; 4,
-    Function        | "function"        ; 5,
-    Typedef         | "typedef"         ; 6,
-    Static          | "static"          ; 7,
-    Trait           | "trait"           ; 8,
-    Impl            | "impl"            ; 9,
-    TyMethod        | "tymethod"        ; 10,
-    Method          | "method"          ; 11,
-    StructField     | "structfield"     ; 12,
-    Variant         | "variant"         ; 13,
-    Macro           | "macro"           ; 14,
-    Primitive       | "primitive"       ; 15,
-    AssociatedType  | "associatedtype"  ; 16,
-    Constant        | "constant"        ; 17,
-    AssociatedConst | "associatedconst" ; 18,
-    Union           | "union"           ; 19,
-    ForeignType     | "foreigntype"     ; 20,
-    Keyword         | "keyword"         ; 21,
-    Existential     | "existential"     ; 22,
-});
+use string_cache::DefaultAtom as Atom;
 
 #[derive(Debug, Deserialize)]
 struct IndexItemFunctionType {
@@ -89,23 +15,23 @@ struct IndexItemFunctionType {
 #[derive(Debug, Deserialize)]
 struct Type {
     #[serde(rename = "n")]
-    name: Option<DefaultAtom>,
+    name: Option<Atom>,
     #[serde(rename = "g")]
-    generics: Option<Vec<DefaultAtom>>,
+    generics: Option<Vec<Atom>>,
 }
 
 #[derive(Clone, Debug, Deserialize)]
 struct Parent {
-    ty: ItemType,
-    name: DefaultAtom,
+    ty: usize,
+    name: Atom,
 }
 
 #[derive(Debug, Deserialize)]
 struct IndexItem {
-    ty: ItemType,
-    name: DefaultAtom,
-    path: DefaultAtom,
-    desc: DefaultAtom,
+    ty: usize,
+    name: Atom,
+    path: Atom,
+    desc: Atom,
     #[serde(skip_deserializing)]
     parent: Option<Parent>,
     parent_idx: Option<usize>,
@@ -114,7 +40,7 @@ struct IndexItem {
 
 #[derive(Debug, Deserialize)]
 struct SearchIndex {
-    doc: DefaultAtom,
+    doc: Atom,
     items: Vec<IndexItem>,
     paths: Vec<Parent>,
 }
@@ -122,27 +48,10 @@ struct SearchIndex {
 impl From<IndexItem> for DocItem {
     /// Convert an IndexItem to DocItem based on if parent exists.
     fn from(item: IndexItem) -> DocItem {
-        let mut url = item.path.replace("::", "/");
-        if let Some(ref parent) = item.parent {
-            write!(
-                url,
-                "/{}.{}.html#{}.{}",
-                parent.ty, parent.name, item.ty, item.name
-            )
-        } else {
-            write!(url, "/{}.{}.html", item.ty, item.name)
-        }.unwrap();
+        let name = TypeItem::new(item.ty, item.name);
+        let parent = item.parent.map(|x| TypeItem::new(x.ty, x.name));
 
-        let desc = if let Some(ref parent) = item.parent {
-            format!(
-                "{}::{}::{} {}",
-                item.path, parent.name, item.name, item.desc
-            )
-        } else {
-            format!("{}::{} {}", item.path, item.name, item.desc)
-        };
-
-        DocItem::new(url, desc)
+        DocItem::new(name, parent, item.path)
     }
 }
 
@@ -150,14 +59,14 @@ impl FromStr for RustDoc {
     type Err = serde_json::Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let mut items = Vec::new();
+        let mut items = HashSet::new();
 
         for line in s.lines().filter(|x| x.starts_with("searchIndex")) {
             let start = line.find('=').unwrap() + 2;
             let end = line.len() - 1;
             let index: SearchIndex = serde_json::from_str(&line[start..end]).unwrap();
 
-            let mut last_path = DefaultAtom::from("");
+            let mut last_path = Atom::from("");
             let parents = index.paths;
 
             for mut item in index.items {
@@ -172,7 +81,7 @@ impl FromStr for RustDoc {
                 // parent_idx is the index of the item in SearchIndex.paths
                 item.parent = item.parent_idx.map(|idx| parents[idx].clone());
 
-                items.push(DocItem::from(item));
+                items.insert(DocItem::from(item));
             }
         }
 
