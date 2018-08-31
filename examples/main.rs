@@ -6,7 +6,12 @@ fn main() {
     let data = fs::read_to_string("search-index.js").unwrap();
     let rustdoc: RustDoc = data.parse().unwrap();
     let seeker = rustdoc.build().unwrap();
-    for i in seeker.search(".*dedup.*") {
-        println!("{:#?}", i);
+    println!("Regex");
+    for i in seeker.search_regex("dedup.*") {
+        println!("{}", i);
+    }
+    println!("\nEdit Distance");
+    for i in seeker.search_edist("dedap", 1) {
+        println!("{}", i);
     }
 }
