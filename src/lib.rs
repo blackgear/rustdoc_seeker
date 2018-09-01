@@ -12,8 +12,6 @@
 //! ```
 
 extern crate fst;
-extern crate fst_levenshtein;
-extern crate fst_regex;
 extern crate serde;
 #[macro_use]
 extern crate serde_derive;
