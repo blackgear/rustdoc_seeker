@@ -1,6 +1,4 @@
-use fst::{self, IntoStreamer, Map, MapBuilder};
-use fst_levenshtein::Levenshtein;
-use fst_regex::Regex;
+use fst::{self, Automaton, IntoStreamer, Map, MapBuilder};
 use std::collections::HashSet;
 use std::fmt;
 use std::iter::FromIterator;
@@ -186,38 +184,30 @@ pub struct RustDocSeeker {
 }
 
 impl RustDocSeeker {
-    /// Regex based searching
+    /// Search with fst::Automaton, read fst::automaton / fst-levenshtein / fst-regex for details.
     ///
     /// # Example
     ///
     /// ```
-    /// for i in seeker.search_regex(".*dedup.*") {
+    /// let aut = fst_regex::Regex::new(".*dedup.*").unwrap();
+    /// for i in seeker.search(aut) {
     ///     println!("{:?}", i);
     /// }
-    /// ```
-    pub fn search_regex(&self, keyword: &str) -> impl Iterator<Item = &DocItem> {
-        let dfa = Regex::new(keyword).unwrap();
-        let result = self.index.search(&dfa).into_stream().into_values();
-
-        result.into_iter().flat_map(move |idx| {
-            let start = (idx >> 32) as usize;
-            let end = (idx & 0xffffffff) as usize;
-            &self.items[start..end]
-        })
-    }
-
-    /// Edit Distence based searching
     ///
-    /// # Example
-    ///
-    /// ```
-    /// for i in seeker.search_edist("dedup", ("dedup".len() as f32 * 0.3) as u32) {
+    /// let aut = fst_levenshtein::Levenshtein::new("dedXp", 1).unwrap();
+    /// for i in seeker.search(aut) {
     ///     println!("{:?}", i);
     /// }
+    ///
+    ///
+    /// let aut = fst::automaton::Subsequence::new("dedup", 1).unwrap();
+    /// for i in seeker.search(aut) {
+    ///     println!("{:?}", i);
+    /// }
+    ///
     /// ```
-    pub fn search_edist(&self, keyword: &str, distance: u32) -> impl Iterator<Item = &DocItem> {
-        let dfa = Levenshtein::new(keyword, distance).unwrap();
-        let result = self.index.search(&dfa).into_stream().into_values();
+    pub fn search<A: Automaton>(&self, aut: &A) -> impl Iterator<Item = &DocItem> {
+        let result = self.index.search(aut).into_stream().into_values();
 
         result.into_iter().flat_map(move |idx| {
             let start = (idx >> 32) as usize;
