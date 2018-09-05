@@ -30,9 +30,10 @@ macro_rules! enum_number {
                     _ => unreachable!()
                 }
             }
+        }
 
-            /// Get the plain inner name of the TypeItem
-            pub fn plain(&self) -> &Atom {
+        impl AsRef<Atom> for $name {
+            fn as_ref(&self) -> &Atom {
                 match self {
                     $( $name::$variant(data) => data, )*
                 }
@@ -109,8 +110,9 @@ impl DocItem {
         }
     }
 
-    pub fn key(&self) -> &Atom {
-        self.name.plain()
+    /// Return the key of the DocItem for index
+    pub fn key(&self) -> &[u8] {
+        self.name.as_ref().as_bytes()
     }
 }
 
@@ -202,13 +204,13 @@ impl RustDoc {
 
             for idx in 1..items.len() {
                 if name != items[idx].key() {
-                    builder.insert(name.as_bytes(), ((start as u64) << 32) + idx as u64)?;
+                    builder.insert(name, ((start as u64) << 32) + idx as u64)?;
                     name = items[idx].key();
                     start = idx;
                 };
             }
 
-            builder.insert(name.as_bytes(), ((start as u64) << 32) + items.len() as u64)?;
+            builder.insert(name, ((start as u64) << 32) + items.len() as u64)?;
         }
 
         let index = Map::from_bytes(builder.into_inner()?)?;
