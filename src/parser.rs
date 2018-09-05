@@ -51,7 +51,7 @@ impl From<IndexItem> for DocItem {
         let name = TypeItem::new(item.ty, item.name);
         let parent = item.parent.map(|x| TypeItem::new(x.ty, x.name));
 
-        DocItem::new(name, parent, item.path)
+        DocItem::new(name, parent, item.path, item.desc)
     }
 }
 

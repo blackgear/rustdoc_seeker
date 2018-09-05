@@ -1,12 +1,23 @@
 use fst::{self, Automaton, IntoStreamer, Map, MapBuilder};
 use std::collections::HashSet;
 use std::fmt;
+use std::hash::{Hash, Hasher};
 use std::iter::FromIterator;
 use string_cache::DefaultAtom as Atom;
 
 macro_rules! enum_number {
     ($name:ident { $($variant:ident | $display:tt | $value:tt, )* }) => {
-        /// TypeItem represent an item with type
+        /// TypeItem represent an item with type,
+        /// Use `Display` to get the `type dot name` format of the item
+        ///
+        /// # Example
+        /// ```
+        /// assert_eq!("module.vec", TypeItme::Module(vec));
+        /// assert_eq!("macro.vec", TypeItme::Macro(vec));
+        ///
+        /// assert_eq!("fn.vec", TypeItme::Function(vec)); // the only two exceptions
+        /// assert_eq!("type.vec", TypeItme::Typedef(vec)); // the only two exceptions
+        /// ```
         #[derive(Clone, Debug, Eq, Hash, PartialEq)]
         pub enum $name {
             $($variant(Atom),)*
@@ -20,6 +31,7 @@ macro_rules! enum_number {
                 }
             }
 
+            /// Get the plain inner name of the TypeItem
             pub fn plain(&self) -> &Atom {
                 match self {
                     $( $name::$variant(data) => data, )*
@@ -44,8 +56,8 @@ enum_number!(TypeItem {
     Import          | "import"          | 2,
     Struct          | "struct"          | 3,
     Enum            | "enum"            | 4,
-    Function        | "function"        | 5,
-    Typedef         | "typedef"         | 6,
+    Function        | "fn"              | 5,
+    Typedef         | "type"            | 6,
     Static          | "static"          | 7,
     Trait           | "trait"           | 8,
     Impl            | "impl"            | 9,
@@ -64,21 +76,55 @@ enum_number!(TypeItem {
     Existential     | "existential"     | 22,
 });
 
-/// DocItem represent a searchable item
-#[derive(Debug, Eq, Hash, PartialEq)]
+/// DocItem represent a searchable item,
+/// Use `Display` to get the relative URI of the item
+///
+/// eg:
+///
+/// The `dedup` (name) function of the `Vec`(parent) struct in `std::vec`(path) module.
+///
+/// The `Vec`(name) struct of `None`(parent) in `std::vec`(path) module.
+///
+/// The `vec`(name) module of `None`(parent) in `std`(path) module.
+///
+/// # Example
+/// ```
+/// println!("{} is the url of {:?}", &docitem, &docitem)
+/// ```
+#[derive(Debug, Eq)]
 pub struct DocItem {
     pub name: TypeItem,
     pub parent: Option<TypeItem>,
     pub path: Atom,
+    pub desc: Atom,
 }
 
 impl DocItem {
-    pub fn new(name: TypeItem, parent: Option<TypeItem>, path: Atom) -> DocItem {
-        DocItem { name, parent, path }
+    pub fn new(name: TypeItem, parent: Option<TypeItem>, path: Atom, desc: Atom) -> DocItem {
+        DocItem {
+            name,
+            parent,
+            path,
+            desc,
+        }
     }
 
     pub fn key(&self) -> &Atom {
         self.name.plain()
+    }
+}
+
+impl PartialEq for DocItem {
+    fn eq(&self, other: &DocItem) -> bool {
+        self.name == other.name && self.parent == other.parent && self.path == other.path
+    }
+}
+
+impl Hash for DocItem {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.name.hash(state);
+        self.parent.hash(state);
+        self.path.hash(state);
     }
 }
 
@@ -90,7 +136,10 @@ impl fmt::Display for DocItem {
         if let Some(ref parent) = self.parent {
             write!(f, "{}.html#{}", parent, self.name)
         } else {
-            write!(f, "{}.html", self.name)
+            match &self.name {
+                TypeItem::Module(name) => write!(f, "{}/index.html", name),
+                _ => write!(f, "{}.html", self.name),
+            }
         }
     }
 }
