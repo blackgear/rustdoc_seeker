@@ -37,7 +37,6 @@ macro_rules! enum_number {
                 match self {
                     $( $name::$variant(data) => data, )*
                 }
-
             }
         }
 
@@ -111,7 +110,7 @@ impl DocItem {
     }
 
     /// Return the key of the DocItem for index
-    pub fn key(&self) -> &[u8] {
+    fn key(&self) -> &[u8] {
         self.name.as_ref().as_bytes()
     }
 }
@@ -192,6 +191,10 @@ impl RustDoc {
         RustDoc { items }
     }
 
+    pub fn iter(&self) -> impl Iterator<Item = &DocItem> {
+        self.items.iter()
+    }
+
     /// Build an index for searching
     pub fn build(self) -> Result<RustDocSeeker, fst::Error> {
         let mut builder = MapBuilder::memory();
@@ -220,8 +223,8 @@ impl RustDoc {
 
 /// RustDocSeeker contains DocItems and Index for fast searching
 ///
-/// The index is kv-map fro <name, idx: u64 = (start: u32 << 32) + end: u32>
-/// where items[start..end] have the same DocItem.name.
+/// The index is kv-map for <name, idx: u64 = (start: u32 << 32) + end: u32>
+/// where items[start..end] having the same DocItem.name.
 ///
 /// # Example
 ///
@@ -249,7 +252,6 @@ impl RustDocSeeker {
     /// for i in seeker.search(aut) {
     ///     println!("{:?}", i);
     /// }
-    ///
     ///
     /// let aut = fst::automaton::Subsequence::new("dedup", 1).unwrap();
     /// for i in seeker.search(aut) {
