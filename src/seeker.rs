@@ -1,4 +1,5 @@
 use fst::{self, Automaton, IntoStreamer, Map, MapBuilder};
+use itertools::Itertools;
 use std::cmp::{Ord, Ordering};
 use std::collections::BTreeSet;
 use std::fmt;
@@ -207,19 +208,14 @@ impl RustDoc {
         let mut builder = MapBuilder::memory();
         let items: Vec<_> = self.items.into_iter().collect();
 
-        if items.len() > 0 {
-            let mut key = &items[0].key;
-            let mut start = 0;
-
-            for idx in 1..items.len() {
-                if key != &items[idx].key {
-                    builder.insert(key.as_ref(), ((start as u64) << 32) + idx as u64)?;
-                    key = &items[idx].key;
-                    start = idx;
-                };
+        {
+            let groups = items.iter().enumerate().group_by(|(_, item)| &item.key);
+            for (key, mut group) in groups.into_iter() {
+                let (start, _) = group.next().unwrap();
+                let end = group.last().map_or(start, |(i, _)| i) + 1;
+                let val = ((start as u64) << 32) + end as u64;
+                builder.insert(key.as_ref(), val)?;
             }
-
-            builder.insert(key.as_ref(), ((start as u64) << 32) + items.len() as u64)?;
         }
 
         let index = Map::from_bytes(builder.into_inner()?)?;
