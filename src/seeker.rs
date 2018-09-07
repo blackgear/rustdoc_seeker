@@ -94,6 +94,8 @@ enum_number!(TypeItem {
 #[derive(Debug, Eq)]
 pub struct DocItem {
     pub name: TypeItem,
+    /// Same as `name` but lowercased.
+    pub key: Atom,
     pub parent: Option<TypeItem>,
     pub path: Atom,
     pub desc: Atom,
@@ -101,17 +103,14 @@ pub struct DocItem {
 
 impl DocItem {
     pub fn new(name: TypeItem, parent: Option<TypeItem>, path: Atom, desc: Atom) -> DocItem {
+        let key = name.as_ref().to_ascii_lowercase();
         DocItem {
             name,
+            key,
             parent,
             path,
             desc,
         }
-    }
-
-    /// Return the key of the DocItem for index
-    fn key(&self) -> &[u8] {
-        self.name.as_ref().as_bytes()
     }
 
     fn parent_atom(&self) -> Option<&Atom> {
@@ -127,7 +126,7 @@ impl PartialEq for DocItem {
 
 impl Ord for DocItem {
     fn cmp(&self, other: &Self) -> Ordering {
-        self.name.as_ref().cmp(other.name.as_ref())
+        self.key.cmp(&other.key)
             .then_with(|| self.path.cmp(&other.path))
             .then_with(|| self.parent_atom().cmp(&other.parent_atom()))
     }
@@ -209,18 +208,18 @@ impl RustDoc {
         let items: Vec<_> = self.items.into_iter().collect();
 
         if items.len() > 0 {
-            let mut name = items[0].key();
+            let mut key = &items[0].key;
             let mut start = 0;
 
             for idx in 1..items.len() {
-                if name != items[idx].key() {
-                    builder.insert(name, ((start as u64) << 32) + idx as u64)?;
-                    name = items[idx].key();
+                if key != &items[idx].key {
+                    builder.insert(key.as_ref(), ((start as u64) << 32) + idx as u64)?;
+                    key = &items[idx].key;
                     start = idx;
                 };
             }
 
-            builder.insert(name, ((start as u64) << 32) + items.len() as u64)?;
+            builder.insert(key.as_ref(), ((start as u64) << 32) + items.len() as u64)?;
         }
 
         let index = Map::from_bytes(builder.into_inner()?)?;
