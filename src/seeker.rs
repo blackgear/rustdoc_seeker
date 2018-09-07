@@ -117,7 +117,7 @@ impl DocItem {
         }
     }
 
-    pub fn fmt_str(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    pub fn fmt_naive(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{}::", self.path)?;
         if let Some(ref parent) = self.parent {
             write!(f, "{}::", parent)?;
