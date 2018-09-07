@@ -206,7 +206,7 @@ impl RustDoc {
     /// Build an index for searching
     pub fn build(self) -> Result<RustDocSeeker, fst::Error> {
         let mut builder = MapBuilder::memory();
-        let items: Vec<_> = self.items.into_iter().collect();
+        let items = self.items.into_iter().collect_vec().into_boxed_slice();
 
         {
             let groups = items.iter().enumerate().group_by(|(_, item)| &item.key);
@@ -235,7 +235,7 @@ impl RustDoc {
 /// ```
 #[derive(Debug)]
 pub struct RustDocSeeker {
-    items: Vec<DocItem>,
+    items: Box<[DocItem]>,
     index: Map,
 }
 
