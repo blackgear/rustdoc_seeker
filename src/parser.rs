@@ -1,6 +1,6 @@
 use seeker::{DocItem, RustDoc, TypeItem};
 use serde_json;
-use std::collections::HashSet;
+use std::collections::BTreeSet;
 use std::str::FromStr;
 use string_cache::DefaultAtom as Atom;
 
@@ -59,7 +59,7 @@ impl FromStr for RustDoc {
     type Err = serde_json::Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let mut items = HashSet::new();
+        let mut items = BTreeSet::new();
 
         for line in s.lines().filter(|x| x.starts_with("searchIndex")) {
             let start = line.find('=').unwrap() + 2;

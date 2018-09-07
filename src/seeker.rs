@@ -1,7 +1,7 @@
 use fst::{self, Automaton, IntoStreamer, Map, MapBuilder};
-use std::collections::HashSet;
+use std::cmp::{Ord, Ordering};
+use std::collections::BTreeSet;
 use std::fmt;
-use std::hash::{Hash, Hasher};
 use std::iter::FromIterator;
 use string_cache::DefaultAtom as Atom;
 
@@ -113,6 +113,10 @@ impl DocItem {
     fn key(&self) -> &[u8] {
         self.name.as_ref().as_bytes()
     }
+
+    fn parent_atom(&self) -> Option<&Atom> {
+        self.parent.as_ref().map(|p| p.as_ref())
+    }
 }
 
 impl PartialEq for DocItem {
@@ -121,11 +125,17 @@ impl PartialEq for DocItem {
     }
 }
 
-impl Hash for DocItem {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        self.name.hash(state);
-        self.parent.hash(state);
-        self.path.hash(state);
+impl Ord for DocItem {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.name.as_ref().cmp(other.name.as_ref())
+            .then_with(|| self.path.cmp(&other.path))
+            .then_with(|| self.parent_atom().cmp(&other.parent_atom()))
+    }
+}
+
+impl PartialOrd for DocItem {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
     }
 }
 
@@ -158,14 +168,12 @@ impl fmt::Display for DocItem {
 /// ```
 #[derive(Debug)]
 pub struct RustDoc {
-    items: HashSet<DocItem>,
+    items: BTreeSet<DocItem>,
 }
 
 impl Extend<DocItem> for RustDoc {
     fn extend<T: IntoIterator<Item = DocItem>>(&mut self, iter: T) {
-        for elem in iter {
-            self.items.insert(elem);
-        }
+        self.items.extend(iter);
     }
 }
 
@@ -179,7 +187,7 @@ impl FromIterator<DocItem> for RustDoc {
 
 impl IntoIterator for RustDoc {
     type Item = DocItem;
-    type IntoIter = ::std::collections::hash_set::IntoIter<DocItem>;
+    type IntoIter = <BTreeSet<DocItem> as IntoIterator>::IntoIter;
 
     fn into_iter(self) -> Self::IntoIter {
         self.items.into_iter()
@@ -187,7 +195,7 @@ impl IntoIterator for RustDoc {
 }
 
 impl RustDoc {
-    pub fn new(items: HashSet<DocItem>) -> RustDoc {
+    pub fn new(items: BTreeSet<DocItem>) -> RustDoc {
         RustDoc { items }
     }
 
@@ -198,10 +206,9 @@ impl RustDoc {
     /// Build an index for searching
     pub fn build(self) -> Result<RustDocSeeker, fst::Error> {
         let mut builder = MapBuilder::memory();
-        let mut items: Vec<_> = self.items.into_iter().collect();
+        let items: Vec<_> = self.items.into_iter().collect();
 
         if items.len() > 0 {
-            items.sort_unstable_by(|a, b| a.key().cmp(b.key()));
             let mut name = items[0].key();
             let mut start = 0;
 
