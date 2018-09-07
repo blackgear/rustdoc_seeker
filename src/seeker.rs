@@ -10,15 +10,16 @@ use string_cache::DefaultAtom as Atom;
 macro_rules! enum_number {
     ($name:ident { $($variant:ident | $display:tt | $value:tt, )* }) => {
         /// TypeItem represent an item with type,
-        /// Use `Display` to get the `type dot name` format of the item
+        /// Use `Display` or `fmt_url` to get the `type dot name` format of the item.
         ///
         /// # Example
-        /// ```
-        /// assert_eq!("module.vec", TypeItme::Module(vec));
-        /// assert_eq!("macro.vec", TypeItme::Macro(vec));
         ///
-        /// assert_eq!("fn.vec", TypeItme::Function(vec)); // the only two exceptions
-        /// assert_eq!("type.vec", TypeItme::Typedef(vec)); // the only two exceptions
+        /// ```
+        /// assert_eq!("module.vec", TypeItme::Module("vec"));
+        /// assert_eq!("macro.vec", TypeItme::Macro("vec"));
+        ///
+        /// assert_eq!("fn.vec", TypeItme::Function("vec")); // the only two exceptions
+        /// assert_eq!("type.vec", TypeItme::Typedef("vec")); // the only two exceptions
         /// ```
         #[derive(Clone, Debug, Eq, PartialEq)]
         pub enum $name {
@@ -79,7 +80,7 @@ enum_number!(TypeItem {
 });
 
 /// DocItem represent a searchable item,
-/// Use `Display` to get the relative URI of the item
+/// Use `Display` to get the relative URI of the item.
 ///
 /// eg:
 ///
@@ -90,6 +91,7 @@ enum_number!(TypeItem {
 /// The `vec`(name) module of `None`(parent) in `std`(path) module.
 ///
 /// # Example
+///
 /// ```
 /// println!("{} is the url of {:?}", &docitem, &docitem)
 /// ```
@@ -169,7 +171,7 @@ impl fmt::Display for DocItem {
     }
 }
 
-/// RustDoc contains DocItems, which could be convert to RustDocSeeker
+/// RustDoc contains DocItems, which could be convert to RustDocSeeker.
 ///
 /// # Example
 ///
@@ -230,17 +232,19 @@ impl RustDoc {
                 let (start, _) = group.next().unwrap();
                 let end = group.last().map_or(start, |(i, _)| i) + 1;
                 let val = ((start as u64) << 32) + end as u64;
+                // We already sort and dedup using BTreeSet, so it always safe to unwrap.
                 builder.insert(key.as_ref(), val).unwrap();
             }
         }
 
+        // Since we use MapBuilder::memory, the only way to panic is OOM
         let bytes = builder.into_inner().unwrap();
         let index = Map::from_bytes(bytes).unwrap();
         RustDocSeeker { items, index }
     }
 }
 
-/// RustDocSeeker contains DocItems and Index for fast searching
+/// RustDocSeeker contains DocItems and Index for fast searching.
 ///
 /// The index is kv-map for <name, idx: u64 = (start: u32 << 32) + end: u32>
 /// where items[start..end] having the same DocItem.name.
@@ -248,7 +252,7 @@ impl RustDoc {
 /// # Example
 ///
 /// ```
-/// let seeker = rustdoc.build().unwrap();
+/// let seeker = rustdoc.build();
 /// ```
 #[derive(Debug)]
 pub struct RustDocSeeker {
@@ -258,6 +262,8 @@ pub struct RustDocSeeker {
 
 impl RustDocSeeker {
     /// Search with fst::Automaton, read fst::automaton / fst-levenshtein / fst-regex for details.
+    ///
+    /// We use lowercase name as index, so you should always keep search keyword lowercase.
     ///
     /// # Example
     ///
@@ -272,7 +278,7 @@ impl RustDocSeeker {
     ///     println!("{:?}", i);
     /// }
     ///
-    /// let aut = fst::automaton::Subsequence::new("dedup", 1).unwrap();
+    /// let aut = fst::automaton::Subsequence::new("dedup");
     /// for i in seeker.search(aut) {
     ///     println!("{:?}", i);
     /// }

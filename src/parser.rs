@@ -121,7 +121,13 @@ mod test {
               "",
               "Returns a pointer meeting the size and alignment guarantees of `layout`.",
               3,
-              {"i":[{"n":"self"},{"n":"layout"}],"o":{"g":["nonnull","allocerr"],"n":"result"}}]
+              {"i":[{"n":"self"},{"n":"layout"}],"o":{"g":["nonnull","allocerr"],"n":"result"}}
+            ]
+          ],
+          "paths": [
+            [0, ""],
+            [0, ""],
+            [8, "Alloc"]
           ]
         }
         "#;
