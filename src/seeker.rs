@@ -1,9 +1,10 @@
-use fst::{self, Automaton, IntoStreamer, Map, MapBuilder};
+use fst::{Automaton, IntoStreamer, Map, MapBuilder};
 use itertools::Itertools;
 use std::cmp::{Ord, Ordering};
 use std::collections::BTreeSet;
 use std::fmt;
 use std::iter::FromIterator;
+use std::u32;
 use string_cache::DefaultAtom as Atom;
 
 macro_rules! enum_number {
@@ -204,9 +205,10 @@ impl RustDoc {
     }
 
     /// Build an index for searching
-    pub fn build(self) -> Result<RustDocSeeker, fst::Error> {
+    pub fn build(self) -> RustDocSeeker {
         let mut builder = MapBuilder::memory();
         let items: Vec<_> = self.items.into_iter().collect();
+        assert!(items.len() as u64 <= u32::MAX as u64);
 
         {
             let groups = items.iter().enumerate().group_by(|(_, item)| &item.key);
@@ -214,12 +216,13 @@ impl RustDoc {
                 let (start, _) = group.next().unwrap();
                 let end = group.last().map_or(start, |(i, _)| i) + 1;
                 let val = ((start as u64) << 32) + end as u64;
-                builder.insert(key.as_ref(), val)?;
+                builder.insert(key.as_ref(), val).unwrap();
             }
         }
 
-        let index = Map::from_bytes(builder.into_inner()?)?;
-        Ok(RustDocSeeker { items, index })
+        let bytes = builder.into_inner().unwrap();
+        let index = Map::from_bytes(bytes).unwrap();
+        RustDocSeeker { items, index }
     }
 }
 
