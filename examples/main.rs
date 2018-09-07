@@ -9,7 +9,7 @@ use std::fs;
 fn main() {
     let data = fs::read_to_string("search-index.js").unwrap();
     let rustdoc: RustDoc = data.parse().unwrap();
-    let seeker = rustdoc.build().unwrap();
+    let seeker = rustdoc.build();
 
     let regex = fst_regex::Regex::new(".*dedup.*").unwrap();
     for i in seeker.search(&regex) {
