@@ -1,9 +1,10 @@
-use fst::{self, Automaton, IntoStreamer, Map, MapBuilder};
+use fst::{Automaton, IntoStreamer, Map, MapBuilder};
 use itertools::Itertools;
 use std::cmp::{Ord, Ordering};
 use std::collections::BTreeSet;
 use std::fmt;
 use std::iter::FromIterator;
+use std::u32;
 use string_cache::DefaultAtom as Atom;
 
 macro_rules! enum_number {
@@ -19,7 +20,7 @@ macro_rules! enum_number {
         /// assert_eq!("fn.vec", TypeItme::Function(vec)); // the only two exceptions
         /// assert_eq!("type.vec", TypeItme::Typedef(vec)); // the only two exceptions
         /// ```
-        #[derive(Clone, Debug, Eq, Hash, PartialEq)]
+        #[derive(Clone, Debug, Eq, PartialEq)]
         pub enum $name {
             $($variant(Atom),)*
         }
@@ -114,6 +115,28 @@ impl DocItem {
         }
     }
 
+    pub fn fmt_str(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}::", self.path)?;
+        if let Some(ref parent) = self.parent {
+            write!(f, "{}::", parent)?;
+        };
+        write!(f, "{}", self.name)
+    }
+
+    pub fn fmt_url(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        for part in self.path.split("::") {
+            write!(f, "{}/", part)?;
+        }
+        if let Some(ref parent) = self.parent {
+            write!(f, "{}.html#{}", parent, self.name)
+        } else {
+            match &self.name {
+                TypeItem::Module(name) => write!(f, "{}/index.html", name),
+                _ => write!(f, "{}.html", self.name),
+            }
+        }
+    }
+
     fn parent_atom(&self) -> Option<&Atom> {
         self.parent.as_ref().map(|p| p.as_ref())
     }
@@ -127,7 +150,8 @@ impl PartialEq for DocItem {
 
 impl Ord for DocItem {
     fn cmp(&self, other: &Self) -> Ordering {
-        self.key.cmp(&other.key)
+        self.key
+            .cmp(&other.key)
             .then_with(|| self.path.cmp(&other.path))
             .then_with(|| self.parent_atom().cmp(&other.parent_atom()))
     }
@@ -141,17 +165,7 @@ impl PartialOrd for DocItem {
 
 impl fmt::Display for DocItem {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        for part in self.path.split("::") {
-            write!(f, "{}/", part)?;
-        }
-        if let Some(ref parent) = self.parent {
-            write!(f, "{}.html#{}", parent, self.name)
-        } else {
-            match &self.name {
-                TypeItem::Module(name) => write!(f, "{}/index.html", name),
-                _ => write!(f, "{}.html", self.name),
-            }
-        }
+        self.fmt_url(f)
     }
 }
 
@@ -204,9 +218,11 @@ impl RustDoc {
     }
 
     /// Build an index for searching
-    pub fn build(self) -> Result<RustDocSeeker, fst::Error> {
+    pub fn build(self) -> RustDocSeeker {
         let mut builder = MapBuilder::memory();
         let items = self.items.into_iter().collect_vec().into_boxed_slice();
+
+        assert!(items.len() as u64 <= u32::MAX as u64);
 
         {
             let groups = items.iter().enumerate().group_by(|(_, item)| &item.key);
@@ -214,12 +230,13 @@ impl RustDoc {
                 let (start, _) = group.next().unwrap();
                 let end = group.last().map_or(start, |(i, _)| i) + 1;
                 let val = ((start as u64) << 32) + end as u64;
-                builder.insert(key.as_ref(), val)?;
+                builder.insert(key.as_ref(), val).unwrap();
             }
         }
 
-        let index = Map::from_bytes(builder.into_inner()?)?;
-        Ok(RustDocSeeker { items, index })
+        let bytes = builder.into_inner().unwrap();
+        let index = Map::from_bytes(bytes).unwrap();
+        RustDocSeeker { items, index }
     }
 }
 
