@@ -220,7 +220,8 @@ impl RustDoc {
     /// Build an index for searching
     pub fn build(self) -> RustDocSeeker {
         let mut builder = MapBuilder::memory();
-        let items: Vec<_> = self.items.into_iter().collect();
+        let items = self.items.into_iter().collect_vec().into_boxed_slice();
+
         assert!(items.len() as u64 <= u32::MAX as u64);
 
         {
@@ -251,7 +252,7 @@ impl RustDoc {
 /// ```
 #[derive(Debug)]
 pub struct RustDocSeeker {
-    items: Vec<DocItem>,
+    items: Box<[DocItem]>,
     index: Map,
 }
 
