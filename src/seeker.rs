@@ -19,7 +19,7 @@ macro_rules! enum_number {
         /// assert_eq!("fn.vec", TypeItme::Function(vec)); // the only two exceptions
         /// assert_eq!("type.vec", TypeItme::Typedef(vec)); // the only two exceptions
         /// ```
-        #[derive(Clone, Debug, Eq, Hash, PartialEq)]
+        #[derive(Clone, Debug, Eq, PartialEq)]
         pub enum $name {
             $($variant(Atom),)*
         }
@@ -114,6 +114,28 @@ impl DocItem {
         }
     }
 
+    pub fn fmt_str(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}::", self.path)?;
+        if let Some(ref parent) = self.parent {
+            write!(f, "{}::", parent)?;
+        };
+        write!(f, "{}", self.name)
+    }
+
+    pub fn fmt_url(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        for part in self.path.split("::") {
+            write!(f, "{}/", part)?;
+        }
+        if let Some(ref parent) = self.parent {
+            write!(f, "{}.html#{}", parent, self.name)
+        } else {
+            match &self.name {
+                TypeItem::Module(name) => write!(f, "{}/index.html", name),
+                _ => write!(f, "{}.html", self.name),
+            }
+        }
+    }
+
     fn parent_atom(&self) -> Option<&Atom> {
         self.parent.as_ref().map(|p| p.as_ref())
     }
@@ -127,7 +149,8 @@ impl PartialEq for DocItem {
 
 impl Ord for DocItem {
     fn cmp(&self, other: &Self) -> Ordering {
-        self.key.cmp(&other.key)
+        self.key
+            .cmp(&other.key)
             .then_with(|| self.path.cmp(&other.path))
             .then_with(|| self.parent_atom().cmp(&other.parent_atom()))
     }
@@ -141,17 +164,7 @@ impl PartialOrd for DocItem {
 
 impl fmt::Display for DocItem {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        for part in self.path.split("::") {
-            write!(f, "{}/", part)?;
-        }
-        if let Some(ref parent) = self.parent {
-            write!(f, "{}.html#{}", parent, self.name)
-        } else {
-            match &self.name {
-                TypeItem::Module(name) => write!(f, "{}/index.html", name),
-                _ => write!(f, "{}.html", self.name),
-            }
-        }
+        self.fmt_url(f)
     }
 }
 
