@@ -98,8 +98,6 @@ enum_number!(TypeItem {
 #[derive(Debug, Eq)]
 pub struct DocItem {
     pub name: TypeItem,
-    /// Same as `name` but lowercased.
-    pub key: Atom,
     pub parent: Option<TypeItem>,
     pub path: Atom,
     pub desc: Atom,
@@ -107,10 +105,8 @@ pub struct DocItem {
 
 impl DocItem {
     pub fn new(name: TypeItem, parent: Option<TypeItem>, path: Atom, desc: Atom) -> DocItem {
-        let key = name.as_ref().to_ascii_lowercase();
         DocItem {
             name,
-            key,
             parent,
             path,
             desc,
@@ -142,6 +138,10 @@ impl DocItem {
     fn parent_atom(&self) -> Option<&Atom> {
         self.parent.as_ref().map(|p| p.as_ref())
     }
+
+    fn index_key(&self) -> &[u8] {
+        self.name.as_ref().as_bytes()
+    }
 }
 
 impl PartialEq for DocItem {
@@ -152,8 +152,8 @@ impl PartialEq for DocItem {
 
 impl Ord for DocItem {
     fn cmp(&self, other: &Self) -> Ordering {
-        self.key
-            .cmp(&other.key)
+        self.index_key()
+            .cmp(&other.index_key())
             .then_with(|| self.path.cmp(&other.path))
             .then_with(|| self.parent_atom().cmp(&other.parent_atom()))
     }
@@ -227,13 +227,17 @@ impl RustDoc {
         assert!(items.len() as u64 <= u32::MAX as u64);
 
         {
-            let groups = items.iter().enumerate().group_by(|(_, item)| &item.key);
+            let groups = items
+                .iter()
+                .enumerate()
+                .group_by(|(_, item)| item.index_key());
+
             for (key, mut group) in groups.into_iter() {
                 let (start, _) = group.next().unwrap();
                 let end = group.last().map_or(start, |(i, _)| i) + 1;
                 let val = ((start as u64) << 32) + end as u64;
                 // We already sort and dedup using BTreeSet, so it always safe to unwrap.
-                builder.insert(key.as_ref(), val).unwrap();
+                builder.insert(key, val).unwrap();
             }
         }
 
@@ -262,8 +266,6 @@ pub struct RustDocSeeker {
 
 impl RustDocSeeker {
     /// Search with fst::Automaton, read fst::automaton / fst-levenshtein / fst-regex for details.
-    ///
-    /// We use lowercase name as index, so you should always keep search keyword lowercase.
     ///
     /// # Example
     ///

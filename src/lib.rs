@@ -4,8 +4,6 @@
 //! let rustdoc: RustDoc = data.parse().unwrap();
 //! let seeker = rustdoc.build();
 //!
-//! // We use lowercase name as index, so you should always keep search keyword lowercase.
-//!
 //! for i in seeker.search_regex("dedup.*") {
 //!     println!("{}", i);
 //! }
