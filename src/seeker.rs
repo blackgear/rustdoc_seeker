@@ -113,7 +113,7 @@ impl DocItem {
         }
     }
 
-    pub fn fmt_naive(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    pub fn fmt_naive(&self, f: &mut impl fmt::Write) -> fmt::Result {
         write!(f, "{}::", self.path)?;
         if let Some(ref parent) = self.parent {
             write!(f, "{}::", parent)?;
@@ -121,7 +121,7 @@ impl DocItem {
         write!(f, "{}", self.name)
     }
 
-    pub fn fmt_url(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    pub fn fmt_url(&self, f: &mut impl fmt::Write) -> fmt::Result {
         for part in self.path.split("::") {
             write!(f, "{}/", part)?;
         }
