@@ -62,9 +62,9 @@ impl FromStr for RustDoc {
         let mut items = BTreeSet::new();
 
         for line in s.lines().filter(|x| x.starts_with("searchIndex")) {
-            let start = line.find('=').unwrap() + 2;
-            let end = line.len() - 1;
-            let index: SearchIndex = serde_json::from_str(&line[start..end]).unwrap();
+            let eq = line.find('=').unwrap() + 1;
+            let line = line.split_at(eq).1.trim().trim_end_matches(';');
+            let index: SearchIndex = serde_json::from_str(line).unwrap();
 
             let mut last_path = Atom::from("");
             let parents = index.paths;
