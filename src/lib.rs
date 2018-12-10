@@ -20,6 +20,7 @@ extern crate serde_derive;
 extern crate serde_json;
 extern crate string_cache;
 
+mod json;
 mod parser;
 mod seeker;
 

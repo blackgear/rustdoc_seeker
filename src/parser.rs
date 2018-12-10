@@ -1,24 +1,9 @@
+use json::fix_json;
 use seeker::{DocItem, RustDoc, TypeItem};
-use serde_json;
+use serde_json::{self, Value};
 use std::collections::BTreeSet;
 use std::str::FromStr;
 use string_cache::DefaultAtom as Atom;
-
-#[derive(Debug, Deserialize)]
-struct IndexItemFunctionType {
-    #[serde(rename = "i")]
-    inputs: Option<Vec<Type>>,
-    #[serde(rename = "o")]
-    output: Option<Type>,
-}
-
-#[derive(Debug, Deserialize)]
-struct Type {
-    #[serde(rename = "n")]
-    name: Option<Atom>,
-    #[serde(rename = "g")]
-    generics: Option<Vec<Atom>>,
-}
 
 #[derive(Clone, Debug, Deserialize)]
 struct Parent {
@@ -35,7 +20,7 @@ struct IndexItem {
     #[serde(skip_deserializing)]
     parent: Option<Parent>,
     parent_idx: Option<usize>,
-    search_type: Option<IndexItemFunctionType>,
+    search_type: Option<Value>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -64,7 +49,10 @@ impl FromStr for RustDoc {
         for line in s.lines().filter(|x| x.starts_with("searchIndex")) {
             let eq = line.find('=').unwrap() + 1;
             let line = line.split_at(eq).1.trim().trim_end_matches(';');
-            let index: SearchIndex = serde_json::from_str(line).unwrap();
+
+            let json = fix_json(line);
+
+            let index: SearchIndex = serde_json::from_str(&json).unwrap();
 
             let mut last_path = Atom::from("");
             let parents = index.paths;
@@ -104,16 +92,16 @@ mod test {
               "any",
               "std",
               "This module implements the `Any` trait, which enables dynamic typing of any `'static` type through runtime reflection.",
-              null,
-              null
+              N,
+              N
             ],
             [
               8,
               "Any",
               "std::any",
               "A type to emulate dynamic typing.",
-              null,
-              null
+              N,
+              N
             ],
             [
               10,
