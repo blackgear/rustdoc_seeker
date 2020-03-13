@@ -8,7 +8,7 @@ pub fn fix_json<S: AsRef<str>>(json: S) -> String {
             'N' if !is_string => {
                 buffer.push_str("null");
                 continue;
-            }
+            },
             '"' if !is_escape => is_string = !is_string,
             '\\' if !is_escape => is_escape = true,
             _ => is_escape = false,

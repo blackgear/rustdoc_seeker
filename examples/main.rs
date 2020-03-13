@@ -1,8 +1,7 @@
-extern crate fst;
-extern crate regex_automata;
-extern crate rustdoc_seeker;
-use fst::automaton::{Levenshtein, Subsequence};
-use fst::Automaton;
+use fst::{
+    automaton::{Levenshtein, Subsequence},
+    Automaton,
+};
 use regex_automata::DenseDFA;
 use rustdoc_seeker::RustDoc;
 use std::fs;

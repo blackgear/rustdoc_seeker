@@ -1,10 +1,12 @@
 use fst::{Automaton, IntoStreamer, Map, MapBuilder};
 use itertools::Itertools;
-use std::cmp::{Ord, Ordering};
-use std::collections::BTreeSet;
-use std::fmt;
-use std::iter::FromIterator;
-use std::u32;
+use std::{
+    cmp::{Ord, Ordering},
+    collections::BTreeSet,
+    fmt,
+    iter::FromIterator,
+    u32,
+};
 use string_cache::DefaultAtom as Atom;
 
 macro_rules! enum_number {
@@ -188,13 +190,13 @@ pub struct RustDoc {
 }
 
 impl Extend<DocItem> for RustDoc {
-    fn extend<T: IntoIterator<Item = DocItem>>(&mut self, iter: T) {
+    fn extend<T: IntoIterator<Item=DocItem>>(&mut self, iter: T) {
         self.items.extend(iter);
     }
 }
 
 impl FromIterator<DocItem> for RustDoc {
-    fn from_iter<I: IntoIterator<Item = DocItem>>(iter: I) -> Self {
+    fn from_iter<I: IntoIterator<Item=DocItem>>(iter: I) -> Self {
         RustDoc {
             items: iter.into_iter().collect(),
         }
@@ -202,8 +204,8 @@ impl FromIterator<DocItem> for RustDoc {
 }
 
 impl IntoIterator for RustDoc {
-    type Item = DocItem;
     type IntoIter = <BTreeSet<DocItem> as IntoIterator>::IntoIter;
+    type Item = DocItem;
 
     fn into_iter(self) -> Self::IntoIter {
         self.items.into_iter()
@@ -212,10 +214,12 @@ impl IntoIterator for RustDoc {
 
 impl RustDoc {
     pub fn new(items: BTreeSet<DocItem>) -> RustDoc {
-        RustDoc { items }
+        RustDoc {
+            items,
+        }
     }
 
-    pub fn iter(&self) -> impl Iterator<Item = &DocItem> {
+    pub fn iter(&self) -> impl Iterator<Item=&DocItem> {
         self.items.iter()
     }
 
@@ -242,7 +246,10 @@ impl RustDoc {
         }
 
         let index = builder.into_map();
-        RustDocSeeker { items, index }
+        RustDocSeeker {
+            items,
+            index,
+        }
     }
 }
 
@@ -282,9 +289,8 @@ impl RustDocSeeker {
     /// for i in seeker.search(aut) {
     ///     println!("{:?}", i);
     /// }
-    ///
     /// ```
-    pub fn search<A: Automaton>(&self, aut: &A) -> impl Iterator<Item = &DocItem> {
+    pub fn search<A: Automaton>(&self, aut: &A) -> impl Iterator<Item=&DocItem> {
         let result = self.index.search(aut).into_stream().into_values();
 
         result.into_iter().flat_map(move |idx| {

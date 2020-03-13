@@ -1,8 +1,10 @@
-use json::fix_json;
-use seeker::{DocItem, RustDoc, TypeItem};
+use crate::{
+    json::fix_json,
+    seeker::{DocItem, RustDoc, TypeItem},
+};
+use serde::Deserialize;
 use serde_json::{self, Value};
-use std::collections::BTreeSet;
-use std::str::FromStr;
+use std::{collections::BTreeSet, str::FromStr};
 use string_cache::DefaultAtom as Atom;
 
 #[derive(Clone, Debug, Deserialize)]
@@ -26,7 +28,9 @@ struct IndexItem {
 #[derive(Debug, Deserialize)]
 struct SearchIndex {
     doc: Atom,
+    #[serde(rename = "i")]
     items: Vec<IndexItem>,
+    #[serde(rename = "p")]
     paths: Vec<Parent>,
 }
 
@@ -80,46 +84,11 @@ impl FromStr for RustDoc {
 #[cfg(test)]
 mod test {
     use super::*;
+    use std::fs;
 
     #[test]
     fn test_parser() {
-        let data = r#"
-        {
-          "doc": "The Rust Standard Library",
-          "items": [
-            [
-              0,
-              "any",
-              "std",
-              "This module implements the `Any` trait, which enables dynamic typing of any `'static` type through runtime reflection.",
-              N,
-              N
-            ],
-            [
-              8,
-              "Any",
-              "std::any",
-              "A type to emulate dynamic typing.",
-              N,
-              N
-            ],
-            [
-              10,
-              "alloc",
-              "",
-              "Returns a pointer meeting the size and alignment guarantees of `layout`.",
-              3,
-              {"i":[{"n":"self"},{"n":"layout"}],"o":{"g":["nonnull","allocerr"],"n":"result"}}
-            ]
-          ],
-          "paths": [
-            [0, ""],
-            [0, ""],
-            [8, "Alloc"]
-          ]
-        }
-        "#;
-        let index: SearchIndex = serde_json::from_str(data).unwrap();
-        println!("{:?}", index);
+        let data = fs::read_to_string("search-index.js").unwrap();
+        let _: RustDoc = data.parse().unwrap();
     }
 }
