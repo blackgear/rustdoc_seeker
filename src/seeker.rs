@@ -241,9 +241,7 @@ impl RustDoc {
             }
         }
 
-        // Since we use MapBuilder::memory, the only way to panic is OOM
-        let bytes = builder.into_inner().unwrap();
-        let index = Map::from_bytes(bytes).unwrap();
+        let index = builder.into_map();
         RustDocSeeker { items, index }
     }
 }
@@ -261,7 +259,7 @@ impl RustDoc {
 #[derive(Debug)]
 pub struct RustDocSeeker {
     items: Box<[DocItem]>,
-    index: Map,
+    index: Map<Vec<u8>>,
 }
 
 impl RustDocSeeker {

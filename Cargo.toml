@@ -7,13 +7,13 @@ repository = "https://github.com/blackgear/rustdoc_seeker"
 license = "MIT"
 
 [dependencies]
-fst = { version = "0.3", default-features = false }
-itertools = "0.8"
-serde = "1.0"
-serde_derive = "1.0"
-serde_json = "1.0"
-string_cache = "0.7"
+fst = { version = "0.4.0", default-features = false }
+itertools = "0.9.0"
+serde = "1.0.104"
+serde_derive = "1.0.104"
+serde_json = "1.0.48"
+string_cache = "0.8.0"
 
 [dev-dependencies]
-fst-levenshtein = "0.2"
-fst-regex = "0.2"
+fst = { version = "0.4.0", features = ["levenshtein"] }
+regex-automata = { version = "0.1.0", features = ["transducer"] }
