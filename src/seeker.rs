@@ -17,11 +17,13 @@ macro_rules! enum_number {
         /// # Example
         ///
         /// ```
-        /// assert_eq!("module.vec", TypeItme::Module("vec"));
-        /// assert_eq!("macro.vec", TypeItme::Macro("vec"));
-        ///
-        /// assert_eq!("fn.vec", TypeItme::Function("vec")); // the only two exceptions
-        /// assert_eq!("type.vec", TypeItme::Typedef("vec")); // the only two exceptions
+        /// # use rustdoc_seeker::TypeItem;
+        /// # use string_cache::Atom;
+        /// assert_eq!(format!("{}", TypeItem::Module(Atom::from("vec"))), "module.vec");
+        /// assert_eq!(format!("{}", TypeItem::Macro(Atom::from("vec"))), "macro.vec");
+        /// // the only two exceptions
+        /// assert_eq!(format!("{}", TypeItem::Function(Atom::from("vec"))), "fn.vec");
+        /// assert_eq!(format!("{}", TypeItem::Typedef(Atom::from("vec"))), "type.vec");
         /// ```
         #[derive(Clone, Debug, Eq, PartialEq)]
         pub enum $name {
@@ -82,20 +84,40 @@ enum_number!(TypeItem {
 });
 
 /// DocItem represent a searchable item,
-/// Use `Display` to get the relative URI of the item.
-///
-/// eg:
-///
-/// The `dedup` (name) function of the `Vec`(parent) struct in `std::vec`(path) module.
-///
-/// The `Vec`(name) struct of `None`(parent) in `std::vec`(path) module.
-///
-/// The `vec`(name) module of `None`(parent) in `std`(path) module.
+/// use `Display` to get the relative URI of the item.
 ///
 /// # Example
 ///
 /// ```
-/// println!("{} is the url of {:?}", &docitem, &docitem)
+/// # use rustdoc_seeker::{DocItem, TypeItem};
+/// # use string_cache::Atom;
+/// #
+/// # let vec_dedup = DocItem {
+/// #     name: TypeItem::Function(Atom::from("dedup")),
+/// #     parent: Some(TypeItem::Struct(Atom::from("Vec"))),
+/// #     path: Atom::from("std::vec"),
+/// #     desc: Atom::from(""),
+/// # };
+/// // `vec_dedup` is the `DocItem` for `std::vec::Vec::dedup`.
+/// assert_eq!(format!("{}", vec_dedup), "std/vec/struct.Vec.html#fn.dedup");
+///
+/// # let vec_struct = DocItem {
+/// #     name: TypeItem::Struct(Atom::from("Vec")),
+/// #     parent: None,
+/// #     path: Atom::from("std::vec"),
+/// #     desc: Atom::from(""),
+/// # };
+/// // `vec_struct` is the `DocItem` for `std::vec::Vec`.
+/// assert_eq!(format!("{}", vec_struct), "std/vec/struct.Vec.html");
+///
+/// # let vec_macro = DocItem {
+/// #     name: TypeItem::Macro(Atom::from("vec")),
+/// #     parent: None,
+/// #     path: Atom::from("std"),
+/// #     desc: Atom::from(""),
+/// # };
+/// // `vec_macro` is the `DocItem` for `std::vec` macro.
+/// assert_eq!(format!("{}", vec_macro), "std/macro.vec.html");
 /// ```
 #[derive(Debug, Eq)]
 pub struct DocItem {
@@ -178,11 +200,11 @@ impl fmt::Display for DocItem {
 /// # Example
 ///
 /// ```
-/// let data = fs::read_to_string("search-index.js").unwrap();
-/// let rustdoc: RustDoc = data.parse().unwrap();
-///
-/// // let's combine RustDoc
-/// rustdoc_a.extend(rustdoc_b)
+/// # use rustdoc_seeker::RustDoc;
+/// # use std::fs;
+/// let data = fs::read_to_string("search-index.js")?;
+/// let rustdoc: RustDoc = data.parse()?;
+/// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
 #[derive(Debug)]
 pub struct RustDoc {
@@ -190,13 +212,13 @@ pub struct RustDoc {
 }
 
 impl Extend<DocItem> for RustDoc {
-    fn extend<T: IntoIterator<Item=DocItem>>(&mut self, iter: T) {
+    fn extend<T: IntoIterator<Item = DocItem>>(&mut self, iter: T) {
         self.items.extend(iter);
     }
 }
 
 impl FromIterator<DocItem> for RustDoc {
-    fn from_iter<I: IntoIterator<Item=DocItem>>(iter: I) -> Self {
+    fn from_iter<I: IntoIterator<Item = DocItem>>(iter: I) -> Self {
         RustDoc {
             items: iter.into_iter().collect(),
         }
@@ -214,12 +236,10 @@ impl IntoIterator for RustDoc {
 
 impl RustDoc {
     pub fn new(items: BTreeSet<DocItem>) -> RustDoc {
-        RustDoc {
-            items,
-        }
+        RustDoc { items }
     }
 
-    pub fn iter(&self) -> impl Iterator<Item=&DocItem> {
+    pub fn iter(&self) -> impl Iterator<Item = &DocItem> {
         self.items.iter()
     }
 
@@ -246,10 +266,7 @@ impl RustDoc {
         }
 
         let index = builder.into_map();
-        RustDocSeeker {
-            items,
-            index,
-        }
+        RustDocSeeker { items, index }
     }
 }
 
@@ -261,6 +278,9 @@ impl RustDoc {
 /// # Example
 ///
 /// ```
+/// # use rustdoc_seeker::RustDoc;
+/// # use std::collections::BTreeSet;
+/// # let rustdoc = RustDoc::new(BTreeSet::new());
 /// let seeker = rustdoc.build();
 /// ```
 #[derive(Debug)]
@@ -270,27 +290,57 @@ pub struct RustDocSeeker {
 }
 
 impl RustDocSeeker {
-    /// Search with fst::Automaton, read fst::automaton / fst-levenshtein / fst-regex for details.
+    /// Search with `fst::Automaton`, read `fst::automaton` for details.
     ///
     /// # Example
     ///
     /// ```
-    /// let aut = fst_regex::Regex::new(".*dedup.*").unwrap();
-    /// for i in seeker.search(aut) {
-    ///     println!("{:?}", i);
-    /// }
+    /// # use rustdoc_seeker::RustDoc;
+    /// # let rustdoc: RustDoc = std::fs::read_to_string("search-index.js")?.parse()?;
+    /// # let seeker = rustdoc.build();
+    /// let aut = regex_automata::DenseDFA::new(".*dedup.*").unwrap();
+    /// assert_eq!(
+    ///     seeker.search(&aut).map(|item| format!("{}", item)).collect::<Vec<_>>(),
+    ///     vec![
+    ///         "alloc/vec/struct.Vec.html#method.dedup",
+    ///         "std/vec/struct.Vec.html#method.dedup",
+    ///         "alloc/vec/struct.Vec.html#method.dedup_by",
+    ///         "std/vec/struct.Vec.html#method.dedup_by",
+    ///         "alloc/vec/struct.Vec.html#method.dedup_by_key",
+    ///         "std/vec/struct.Vec.html#method.dedup_by_key",
+    ///         "std/primitive.slice.html#method.partition_dedup",
+    ///         "std/primitive.slice.html#method.partition_dedup_by",
+    ///         "std/primitive.slice.html#method.partition_dedup_by_key",
+    ///     ],
+    /// );
     ///
-    /// let aut = fst_levenshtein::Levenshtein::new("dedXp", 1).unwrap();
-    /// for i in seeker.search(aut) {
-    ///     println!("{:?}", i);
-    /// }
+    /// let aut = fst::automaton::Levenshtein::new("dedXp", 1).unwrap();
+    /// assert_eq!(
+    ///     seeker.search(&aut).map(|item| format!("{}", item)).collect::<Vec<_>>(),
+    ///     vec![
+    ///         "alloc/vec/struct.Vec.html#method.dedup",
+    ///         "std/vec/struct.Vec.html#method.dedup",
+    ///     ],
+    /// );
     ///
     /// let aut = fst::automaton::Subsequence::new("dedup");
-    /// for i in seeker.search(aut) {
-    ///     println!("{:?}", i);
-    /// }
+    /// assert_eq!(
+    ///     seeker.search(&aut).map(|item| format!("{}", item)).collect::<Vec<_>>(),
+    ///     vec![
+    ///         "alloc/vec/struct.Vec.html#method.dedup",
+    ///         "std/vec/struct.Vec.html#method.dedup",
+    ///         "alloc/vec/struct.Vec.html#method.dedup_by",
+    ///         "std/vec/struct.Vec.html#method.dedup_by",
+    ///         "alloc/vec/struct.Vec.html#method.dedup_by_key",
+    ///         "std/vec/struct.Vec.html#method.dedup_by_key",
+    ///         "std/primitive.slice.html#method.partition_dedup",
+    ///         "std/primitive.slice.html#method.partition_dedup_by",
+    ///         "std/primitive.slice.html#method.partition_dedup_by_key",
+    ///     ],
+    /// );
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
-    pub fn search<A: Automaton>(&self, aut: &A) -> impl Iterator<Item=&DocItem> {
+    pub fn search<A: Automaton>(&self, aut: &A) -> impl Iterator<Item = &DocItem> {
         let result = self.index.search(aut).into_stream().into_values();
 
         result.into_iter().flat_map(move |idx| {
